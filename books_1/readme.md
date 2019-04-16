@@ -4,3 +4,4 @@ Python for Data Analysis
 2、Introduction
 3、IPython
 4、Numpy
+5、Pandas
