@@ -4,6 +4,11 @@ from pandas import DataFrame, Series
 import sys
 import csv
 import json
+from lxml.html import parse
+# urllib2 改为 urllib.request
+from urllib.request import urlopen
+from pandas.io.parsers import TextParser
+from lxml import objectify
 
 # 输入输出通常可以划分为几个大类
 # 读取文本文件和其他更高效的磁盘存储格式
@@ -193,9 +198,9 @@ import json
 # JSON已经成为通过HTTP请求在web浏览器和其他应用程序之间发送
 # 数据的标准格式之一
 # 它是一种比表格型文本格式（如csv）灵活得多的数据格式
-obj = '{"name": "Wes", "places_lived": ["United States", "Spain", "Germany"], \
-       "pet": "", "siblings": [{"name": "Scott", "age": 25, "pet": "Zuko"}, \
-                                 {"name": "Katie", "age": 33, "pet": "Cisco"}]}'
+# obj = '{"name": "Wes", "places_lived": ["United States", "Spain", "Germany"], \
+#        "pet": "", "siblings": [{"name": "Scott", "age": 25, "pet": "Zuko"}, \
+#                                  {"name": "Katie", "age": 33, "pet": "Cisco"}]}'
 # 除其空值null和一些其他的细微差别（如列表末尾不允许存在多余
 # 的逗号）之外，JSON非常接近于有效的Python代码。
 # 基本类型有对象（字典）、数组（列表）、字符串、数值、布尔值以及null
@@ -205,16 +210,103 @@ obj = '{"name": "Wes", "places_lived": ["United States", "Spain", "Germany"], \
 # 通过json.loads即可将JSON字符串转换成Python形式
 # json.loads take a string as input and returns a dictionary as output.
 # json.dumps take a dictionary as input and returns a string as output.
-result = json.loads(obj)
-print(result)
+# result = json.loads(obj)
+# print(result)
 # 相反，json.dumps则将Python对象转换为JSON格式
 # asjson = json.dumps(result)
 # 如何将（一个或一组）JSON对象转换为DataFrame或其他便于分析的
 # 数据结构就由你决定
 # 最简单方便的方式是：向DataFrame构造器传入一组JSON对象，并
 # 选取数据字段的子集
-siblings = DataFrame(result['siblings'], columns=['name', 'age'])
-print(siblings)
+# siblings = DataFrame(result['siblings'], columns=['name', 'age'])
+# print(siblings)
 
 
 # XML和HTML： Web信息收集
+#  Python有许多可以读写HTML和XML格式数据的库
+#  lxml(http://lxml.de)就是其中之一，它能够高效且可靠地解析大文件
+#  lxml有多个编程接口
+#  首先要用lxml.html处理HTML,然后再用lxml.objectify做一些XML处理
+#  首先，找到你希望获取数据的URL，利用urllib2将其打开，然后用lxml
+#  解析得到的数据流
+# parsed = parse(urlopen('http://finance.yahoo.com/q/op?s=AAPL+Options'))
+# doc = parsed.getroot()
+# 通过这个对象，你可以获取特定类型的所有HTML标签，比如含有所需数据的
+# table标签。
+# 假设你想得到该文档中所有的URL链接，HTML中的连接是a标签。
+# 使用文档根节点的findall方法以及一个XPATH
+# links = doc.findall('.//a')
+# print(links[15:20])
+# 要得到URL和链接文本，您必须使用个对象的get方法(URL)和
+# text_content方法(显示文本)
+# lnk = links[28]
+# print(lnk)
+# print(lnk.get('href'))
+# print(lnk.text_content())
+# 编写下面这条列表推导式即可获取文档中的全部URL
+# urls = [lnk.get('href') for lnk in doc.findall('.//a')]
+# print(urls[-10:])
+# 现在，从文档中找出正确表格的办法就是反复试验了
+# 有些网站会给目标表格加上一个id属性
+# tables = doc.findall('.//table')
+# print(tables)
+# calls = tables[0]
+# puts = tables[1]
+# print(calls)
+# print(puts)
+# 每个表格都有一个标题行，然后才是数据行
+# rows = calls.findall('.//tr')
+# print(rows)
+# 对于标题行和数据行，我们希望获取每个单元格内的文本
+# 对于标题行，就是th单元格，对于数据行，则是td单元格
+
+
+# def _unpack(row, kind='td'):
+#     elts = row.findall('.//%s' % kind)
+#     return [val.text_content() for val in elts]
+
+
+# print(_unpack(rows[0], kind='th'))
+# print(_unpack(rows[1], kind='td'))
+# 将所有步骤结合起来，将数据转换为一个DataFrame
+# 由于数值型数据仍然是字符串格式，我们希望将部分列转换为浮点数格式
+# pandas恰好有一个TextParser类可用于自动类型转换
+
+
+# def parse_options_data(table):
+#     rows = table.findall('.//tr')
+#     header = _unpack(rows[0], kind='th')
+#     data = [_unpack(r) for r in rows[1:]]
+#     return TextParser(data, names=header).get_chunk()
+
+
+# 对两个lxml表格对象调用该解析函数并得到最终的DataFrame
+# call_data = parse_options_data(calls)
+# put_data = parse_options_data(puts)
+# print(call_data[:10])
+# print(put_data[:10])
+
+
+# 使用lxml.objectify解析XML
+# XML是另一种常见的支持分层、嵌套数据以及元数据的结构化数据格式
+# 先用lxml.objectify解析改文件，然后通过getroot得到给XML文件的根节点的引用
+path = 'e:/datasets/mta_perf/Performance_MNR.xml'
+parsed = objectify.parse(open(path))
+root = parsed.getroot()
+# root.INDICATOR返回一个用于产生各个<INDICATOR>XML元素的生成器
+# 对于每条记录，我们可以用标记名和数据值填充一个字典
+data = []
+skip_fields = ['PARENT_SEQ', 'INDICATOR_SEQ', 'DESIRED_CHANGE',
+               'DECIMAL_PLACES']
+for elt in root.INDICATOR:
+    elt_data = {}
+    for child in elt.getchildren():
+        if child in skip_fields:
+            continue
+        elt_data[child.tag] = child.pyval
+    data.append(elt_data)
+# 最后，将这组字典转换成一个DataFrame
+perf = DataFrame(data)
+print(perf)
+# XML数据可以比本例复杂得多，每个标记都可以由元数据
+# 
