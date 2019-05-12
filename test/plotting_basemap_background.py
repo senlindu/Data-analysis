@@ -10,7 +10,7 @@ web map tiles from several sources (OpenStreetMap, Stamen).
 """
 # sphinx_gallery_thumbnail_number = 3
 import geopandas
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 ###############################################################################
 # Let's use the NYC borough boundary data that is available in geopandas
@@ -69,3 +69,4 @@ add_basemap(ax, zoom=10)
 ax = df.plot(figsize=(10, 10), alpha=0.5, edgecolor='k')
 add_basemap(ax, zoom=11, url=ctx.sources.ST_TONER_LITE)
 ax.set_axis_off()
+plt.show()
